@@ -1,5 +1,5 @@
 ############################
-VPC
+# VPC
 ############################
 
 resource "aws_vpc" "main" {
@@ -13,7 +13,7 @@ resource "aws_vpc" "main" {
 }
 
 ############################
-Internet Gateway
+# Internet Gateway
 ############################
 
 resource "aws_internet_gateway" "igw" {
@@ -25,7 +25,7 @@ resource "aws_internet_gateway" "igw" {
 }
 
 ############################
-Public Subnet 1
+# Public Subnet 1
 ############################
 
 resource "aws_subnet" "public_1" {
@@ -40,7 +40,7 @@ resource "aws_subnet" "public_1" {
 }
 
 ############################
-Public Subnet 2
+# Public Subnet 2
 ############################
 
 resource "aws_subnet" "public_2" {
@@ -55,7 +55,7 @@ resource "aws_subnet" "public_2" {
 }
 
 ############################
-Private Subnet 1
+# Private Subnet 1
 ############################
 
 resource "aws_subnet" "private_1" {
@@ -69,7 +69,7 @@ resource "aws_subnet" "private_1" {
 }
 
 ############################
-Private Subnet 2
+# Private Subnet 2
 ############################
 
 resource "aws_subnet" "private_2" {
@@ -83,7 +83,36 @@ resource "aws_subnet" "private_2" {
 }
 
 ############################
-Public Route Table
+# Elastic IP
+############################
+
+resource "aws_eip" "nat" {
+  domain = "vpc"
+
+  tags = {
+    Name = "nat-eip"
+  }
+}
+
+############################
+# NAT Gateway
+############################
+
+resource "aws_nat_gateway" "nat" {
+  allocation_id = aws_eip.nat.id
+  subnet_id     = aws_subnet.public_1.id
+
+  depends_on = [
+    aws_internet_gateway.igw
+  ]
+
+  tags = {
+    Name = "nat-gateway"
+  }
+}
+
+############################
+# Public Route Table
 ############################
 
 resource "aws_route_table" "public" {
@@ -100,7 +129,7 @@ resource "aws_route_table" "public" {
 }
 
 ############################
-Route Table Associations
+# Public Route Table Association
 ############################
 
 resource "aws_route_table_association" "public_1" {
@@ -111,4 +140,52 @@ resource "aws_route_table_association" "public_1" {
 resource "aws_route_table_association" "public_2" {
   subnet_id      = aws_subnet.public_2.id
   route_table_id = aws_route_table.public.id
+}
+
+############################
+# Private Route Table
+############################
+
+resource "aws_route_table" "private" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.nat.id
+  }
+
+  tags = {
+    Name = "private-route-table"
+  }
+}
+
+############################
+# Private Route Table Association
+############################
+
+resource "aws_route_table_association" "private_1" {
+  subnet_id      = aws_subnet.private_1.id
+  route_table_id = aws_route_table.private.id
+}
+
+resource "aws_route_table_association" "private_2" {
+  subnet_id      = aws_subnet.private_2.id
+  route_table_id = aws_route_table.private.id
+}
+
+############################
+# RDS DB Subnet Group
+############################
+
+resource "aws_db_subnet_group" "db_subnet_group" {
+  name = "assessment-db-subnet-group"
+
+  subnet_ids = [
+    aws_subnet.private_1.id,
+    aws_subnet.private_2.id
+  ]
+
+  tags = {
+    Name = "assessment-db-subnet-group"
+  }
 }
